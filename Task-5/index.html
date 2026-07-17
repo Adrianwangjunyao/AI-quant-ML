@@ -42,15 +42,15 @@ body{font-family:-apple-system,system-ui,'Microsoft YaHei',sans-serif;font-size:
 .tab{padding:6px 12px;font-size:10px;cursor:pointer;border-bottom:2px solid transparent;color:#64748b;transition:all .15s;font-weight:500}
 .tab:hover{color:#cbd5e1;background:#1a1d27;border-radius:4px 4px 0 0}
 .tab.active{color:#60a5fa;border-bottom-color:#60a5fa;background:transparent}
-.content{flex:1;padding:10px 14px;overflow-y:auto}
+.content{flex:1;padding:14px 18px;overflow-y:auto}
 .tab-pane{display:none}
 .tab-pane.active{display:block}
-.chart-box{background:#1a1d27;border:1px solid #2a3040;border-radius:8px;padding:10px;margin-bottom:8px}
+.chart-box{background:#1a1d27;border:1px solid #2a3040;border-radius:8px;padding:12px;margin-bottom:10px}
 .chart-box h3{font-size:11px;font-weight:600;color:#e2e8f0;margin-bottom:5px}
-.chart-box canvas{width:100%!important;max-height:240px}
-#rocC,#cmpC{max-height:400px!important}
-#cmG>div{min-height:220px}
-.grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px}
+.chart-box canvas{width:100%!important;max-height:260px}
+#rocC,#cmpC{max-height:440px!important}
+#cmG>div{min-height:230px}
+.grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:160px;color:#64748b;font-size:11px}
 .empty-state .icon{font-size:32px;margin-bottom:4px;opacity:.25}
 #log{font-size:10px;color:#64748b;max-height:40px;overflow:hidden;padding:4px 8px;border-top:1px solid #2a3040;background:#12141d;white-space:nowrap;text-overflow:ellipsis}
@@ -107,13 +107,13 @@ body{font-family:-apple-system,system-ui,'Microsoft YaHei',sans-serif;font-size:
     <div class="metric-bar">
       <div class="metric-card"><div class="ml">最佳模型</div><div class="mv" id="m-best">—</div></div>
       <div class="metric-card"><div class="ml">AUC</div><div class="mv" id="m-auc">—</div></div>
-      <div class="metric-card"><div class="ml">夏普比</div><div class="mv" id="m-sharpe">—</div></div>
-      <div class="metric-card"><div class="ml">最大回撤</div><div class="mv" id="m-dd">—</div></div>
+      <div class="metric-card"><div class="ml">Accuracy</div><div class="mv" id="m-acc">—</div></div>
+      <div class="metric-card"><div class="ml">F1 Score</div><div class="mv" id="m-f1">—</div></div>
     </div>
     <div class="tabs">
       <div class="tab active" onclick="tab('roc')">ROC曲线</div>
       <div class="tab" onclick="tab('cm')">混淆矩阵</div>
-      <div class="tab" onclick="tab('fi')">交易指标</div>
+      <div class="tab" onclick="tab('fi')">分类指标</div>
       <div class="tab" onclick="tab('cmp')">模型对比</div>
     </div>
     <div class="content">
@@ -241,7 +241,6 @@ function run(){
 
       var X=vi.map(function(idx){return keys.map(function(k){return f[k][idx];});});
       var y=vi.map(function(idx){return lbl[idx];});
-      var cp=vi.map(function(idx){return f.close[idx];});
 
       var ns=X.length,ts=Math.floor((ns-20)/5),folds=[];
       for(i=0;i<5;i++){var te=ns-(4-i)*ts,teS=te-ts,trE=teS-20;if(trE<10)continue;
@@ -261,7 +260,7 @@ function run(){
         {id:'SVC',build:function(){return new LinearSVCJS(cfg.sv.C,0.01,200);}},
       ];
 
-      var res=[],roc={},cm={},fi={},sim={};
+      var res=[],roc={},cm={};
       log('模型训练中...');
 
       defs.forEach(function(md){
@@ -280,15 +279,6 @@ function run(){
             var rc=rocCurve(teY,ypb);
             roc[md.id]={fpr:rc.fpr,tpr:rc.tpr,auc:rocAuc(teY,ypb)};
             cm[md.id]=confusionMat(teY,yp);
-            var tc=fold.test.map(function(i){return cp[i];});
-            var dr=[];for(var di=1;di<tc.length;di++)dr.push(tc[di]/tc[di-1]-1);
-            var sg=yp.slice(0,-1);var cum=1,pk=1,mdD=0,wn=0;
-            for(di=0;di<dr.length;di++){var rt=sg[di]*dr[di]+(1-sg[di])*0.02/252;cum*=(1+rt);if(rt>0)wn++;pk=Math.max(pk,cum);mdD=Math.min(mdD,(cum-pk)/pk);}
-            var ar=Math.pow(cum,252/dr.length)-1;
-            var ex=dr.map(function(v,i){return sg[i]*v+(1-sg[i])*0.02/252-0.02/252;});
-            var me=ex.reduce(function(a,v){return a+v;},0)/ex.length;
-            var se=Math.sqrt(ex.reduce(function(a,v){return a+(v-me)**2;},0)/ex.length)||1e-10;
-            sim[md.id]={a:ar,sh:Math.sqrt(252)*me/se,md:mdD,wr:wn/dr.length};
           }
         });
         var avg={a:0,p:0,r:0,f:0,u:0};fms.forEach(function(m){avg.a+=m.a;avg.p+=m.p;avg.r+=m.r;avg.f+=m.f;avg.u+=m.u;});
@@ -297,7 +287,7 @@ function run(){
 
       var best=res.reduce(function(a,b){return a.AUC>b.AUC?a:b;});
       log('渲染结果...');
-      setTimeout(function(){render({bm:best.model,ba:best.AUC,res:res,roc:roc,cm:cm,fi:fi,sim:sim});},10);
+      setTimeout(function(){render({bm:best.model,ba:best.AUC,res:res,roc:roc,cm:cm});},10);
     } catch(e){
       err(e.message);console.error(e);
     }
@@ -310,10 +300,9 @@ function render(d){
   try{
   $('m-best').textContent=MN[d.bm]||d.bm;$('m-best').style.color=CL[d.bm]||'#0f172a';
   $('m-auc').textContent=(d.ba||0).toFixed(4);
-  var bs='',bv=-999;Object.keys(d.sim).forEach(function(k){var v=d.sim[k];if(v&&v.sh>bv){bs=k;bv=v.sh;}});
-  $('m-sharpe').textContent=bv===-999?'N/A':bv.toFixed(3);
-  var wd=0;Object.values(d.sim).forEach(function(v){if(v&&v.md<wd)wd=v.md;});
-  $('m-dd').textContent=(wd*100).toFixed(2)+'%';
+  var ba=d.res?d.res.find(function(r){return r.model===d.bm;}):null;
+  $('m-acc').textContent=ba?ba.Accuracy.toFixed(4):'N/A';
+  $('m-f1').textContent=ba?ba.F1.toFixed(4):'N/A';
   $('status').textContent='completed';$('status').className='status';
   $('log').textContent='✅ 完成。共 '+(d.res?d.res.length:0)+' 个模型';
 
@@ -362,19 +351,18 @@ function render(d){
     g.appendChild(dv);
   });
 
-  // ---- 模拟交易指标对比 ----
+  // ---- 分类指标对比 ----
   var fg=$('fiG');
-  fg.innerHTML=''; // 清除旧内容
+  fg.innerHTML='';
   try{
-  var simKeys=Object.keys(d.sim||{});
-  if(simKeys.length>0){
-    var simLabels=simKeys.map(function(k){return MN[k]||k;});
+  if(d.res&&d.res.length>0){
+    var simLabels=d.res.map(function(r){return MN[r.model]||r.model;});
     var pal={LR:'#3b82f6',RF:'#8b5cf6',GBM:'#10b981',SVC:'#f59e0b'};
     var metrics=[
-      {id:'sim-ann',title:'年化收益率(%)',key:'a',fmt:function(v){return((v||0)*100).toFixed(1)+'%'}},
-      {id:'sim-sh',title:'夏普比率',key:'sh',fmt:function(v){return(v||0).toFixed(2)}},
-      {id:'sim-wr',title:'胜率(%)',key:'wr',fmt:function(v){return((v||0)*100).toFixed(1)+'%'}},
-      {id:'sim-dd',title:'最大回撤(%)',key:'md',fmt:function(v){return(Math.abs(v||0)*100).toFixed(1)+'%'}}
+      {id:'met-acc',title:'Accuracy',key:'Accuracy'},
+      {id:'met-pre',title:'Precision',key:'Precision'},
+      {id:'met-rec',title:'Recall',key:'Recall'},
+      {id:'met-f1',title:'F1 Score',key:'F1'}
     ];
     var fiCanvas=$('fiG-canvas');
     if(fiCanvas)fiCanvas.style.display='none';
@@ -383,26 +371,22 @@ function render(d){
     metrics.forEach(function(mt){
       var box=document.createElement('div');
       box.style.cssText='background:#1a1d27;border:1px solid #2a3040;border-radius:6px;padding:6px';
-      box.innerHTML='<div style="font-size:10px;font-weight:600;color:#e2e8f0;margin-bottom:3px;text-align:center">'+mt.title+'</div><canvas id="'+mt.id+'" style="width:100%;height:130px"></canvas>';
+      box.innerHTML='<div style="font-size:10px;font-weight:600;color:#e2e8f0;margin-bottom:3px;text-align:center">'+mt.title+'</div><canvas id="'+mt.id+'" style="width:100%;height:140px"></canvas>';
       grid.appendChild(box);
     });
     fg.appendChild(grid);
     metrics.forEach(function(mt){
-      var vals=simKeys.map(function(k){
-        var v=d.sim[k][mt.key]||0;
-        return mt.key==='md'?Math.abs(v)*100:(mt.key==='sh'?v:(v||0)*100);
-      });
-      var bg=simKeys.map(function(k){return pal[k]||'#3b82f6';});
+      var vals=d.res.map(function(r){return (r[mt.key]||0);});
+      var bg=d.res.map(function(r){return pal[r.model]||'#3b82f6';});
       new Chart(document.getElementById(mt.id),{
         type:'bar',
         data:{labels:simLabels,datasets:[{data:vals,backgroundColor:bg}]},
         options:{responsive:true,maintainAspectRatio:true,indexAxis:'y',
-          scales:{x:{beginAtZero:true,ticks:{font:{size:9}}},y:{ticks:{font:{size:9}}}},
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return mt.fmt(d.sim[simKeys[ctx.dataIndex]][mt.key]);}}}}}
+          scales:{x:{min:0,max:1,beginAtZero:true,ticks:{font:{size:9}}},y:{ticks:{font:{size:9}}}},
+          plugins:{legend:{display:false}}}
       });
     });
-    charts.simCharts=metrics.length;
-  }}catch(e){console.error('Sim chart err:',e);}
+  }}catch(e){console.error('Metric chart err:',e);}
 
   // ---- 对比图表 ----
   try{
