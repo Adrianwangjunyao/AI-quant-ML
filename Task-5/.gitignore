@@ -1,4 +1,3 @@
 # Task-5: 排除可重新生成的文件
 figures/
 .ipynb_checkpoints/
-模型评估报告.pdf
